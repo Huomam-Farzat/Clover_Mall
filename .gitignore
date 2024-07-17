@@ -1,3 +1,17 @@
+<<<<<<< HEAD
+# Django #
+*.log
+*.pot
+*.pyc
+__pycache__/
+local_settings.py
+db.sqlite3
+
+# If your project includes specific directories for temporary files, add them here
+/staticfiles/
+/media/
+/venv/
+=======
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -160,3 +174,4 @@ cython_debug/
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+>>>>>>> 4d87e641d5956d98003c00123206134933c377eb
