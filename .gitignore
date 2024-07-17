@@ -1,0 +1,12 @@
+# Django #
+*.log
+*.pot
+*.pyc
+__pycache__/
+local_settings.py
+db.sqlite3
+
+# If your project includes specific directories for temporary files, add them here
+/staticfiles/
+/media/
+/venv/
