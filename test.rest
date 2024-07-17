@@ -1,0 +1,29 @@
+POST  http://localhost:8000/account/inputdata/ 
+Content-Type: application/json 
+
+    {
+        "first_name" : "ahmad",
+        "last_name" : "Jumaa",
+        "pass_word" : "022265661",
+        "phone_number" : "0997677701"
+    }
+###
+
+
+GET http://localhost:8000/account/test/ 
+
+Content-Type: application/json 
+{}
+
+###
+
+POST http://localhost:8000/account/login/
+
+Content-Type: application/json 
+
+{
+    "phone_number":"0951400708",
+    "password":"022265661"
+    }
+
+
