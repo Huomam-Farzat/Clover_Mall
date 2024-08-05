@@ -23,4 +23,10 @@ urlpatterns = [
     path('orders/user/', views.get_user_orders, name='get_user_orders'),
     path('orders/main-categories/', views.get_orders_by_main_categories, name='get_orders_by_main_categories'),
     path('orders/store/<str:store_name>/', views.get_orders_by_store, name='get_orders_by_store'),
+
+
+    path('product/newProducts' , views.newproducts , name='newProducts'),
+    path('product/bestrate' , views.bestrate , name='bestrate' ),
+    path('product/rateplus' , views.rateplus , name='rateplus' ),
+    path('product/rateminus' , views.rateminus , name='rateminus' )
 ]

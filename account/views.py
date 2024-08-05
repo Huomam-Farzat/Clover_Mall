@@ -1,27 +1,23 @@
-import base64
-import datetime
 import jwt
-import logging
 import json
+import base64
+import logging
+import datetime
+import traceback
 
 from django.conf import settings
-from django.core.exceptions import ValidationError
 from django.http import JsonResponse
+from rest_framework.decorators import api_view
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from rest_framework.decorators import api_view
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.response import Response
 from rest_framework import status
 
-from .models import CustomUser, Product, Order
-from .serializers import UserSerializer, ProductSerializer, OrderSerializer
+from .models import CustomUser , Product , Order
+from .serializers import UserSerializer , ProductSerializer , OrderSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
-
-
-
-
-
 
 
 @api_view(['POST'])
@@ -31,7 +27,7 @@ def inputData(request):
         phone_number = data.get('phone_number')
         us = CustomUser.objects.all()
 
-        if phone_number == us['phone_number']:
+        if CustomUser.objects.filter(phone_number=phone_number).exists():
             return JsonResponse({"data": "Number already exists"}, status=status.HTTP_400_BAD_REQUEST)
 
         if len(phone_number) != 10:
@@ -60,7 +56,6 @@ def inputData(request):
         return JsonResponse({"data": "Something went wrong with your information, please make sure you are entering it correctly"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-
 @api_view(['GET'])
 def getuser(request):
     token = request.COOKIES.get('jwt')
@@ -83,10 +78,6 @@ def getuser(request):
     return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
 
 
-
-
-#Authentication Views
-
 @api_view(['POST'])
 def login(request):
     phone_number = request.data.get('phone_number')
@@ -106,7 +97,7 @@ def login(request):
     token = jwt.encode(payload, settings.SECRET_KEY, algorithm='HS256')
 
     response = Response()
-    response.set_cookie(key='jwt', value=token, httponly=True,samesite='Strict')
+    response.set_cookie(key='jwt', value=token, httponly=True, samesite='Strict')
     response.data = {
         'detail': 'Login successful',
         'jwt': token,
@@ -115,57 +106,56 @@ def login(request):
     return response
 
 
-
-
 @api_view(['POST'])
 def register(request):
     try:
         data = request.data
         phone_number = data.get('phone_number')
         username = data.get('username')
-        
+
         phonenumber = CustomUser.objects.filter(phone_number=phone_number)
         us = CustomUser.objects.filter(username=username)
-        
+
         if len(phone_number) != 10:
             return Response({"data": "Your number is not 10 digits"}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         elif not phone_number.startswith("09"):
             return Response({"data": "Your number doesn't begin with '09'!"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        elif phonenumber :
+
+        elif phonenumber.exists():
             return Response({"data": "Number already exists"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        elif us :
-             return Response({"data": "username already exists"}, status=status.HTTP_400_BAD_REQUEST)
-            
+
+        elif us.exists():
+            return Response({"data": "username already exists"}, status=status.HTTP_400_BAD_REQUEST)
+
         serializer = UserSerializer(data=data)
-        
+
         if serializer.is_valid():
-             user = serializer.save()
-             user.set_password(data.get('password'))
-             user.save()
-            
+            user = serializer.save()
+            user.set_password(data.get('password'))
+            user.save()
+
         payload = {
-                    'id': user.id,
-                    'exp': datetime.datetime.utcnow() + datetime.timedelta(days=180),
-                    'iat': datetime.datetime.utcnow()
-                }
+            'id': user.id,
+            'exp': datetime.datetime.utcnow() + datetime.timedelta(days=180),
+            'iat': datetime.datetime.utcnow()
+        }
         print(payload)
         token = jwt.encode(payload, settings.SECRET_KEY, algorithm='HS256')
 
         response = Response()
         response.set_cookie(key='jwt', value=token, httponly=True)
         response.data = {
-                        'jwt': token,
-                        "status": status.HTTP_201_CREATED,
-                    }
-        return response    
-    
-    except Exception as e :
+            'jwt': token,
+            "status": status.HTTP_201_CREATED,
+        }
+        return response
+
+    except Exception as e:
         print(e)
-        return Response({"data":"somthing wrong!"},status = status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+        return Response({"data": "something wrong!"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 @api_view(['GET'])
 def test_token(request):
     serializer = UserSerializer(data=request.data)
@@ -179,9 +169,6 @@ def test_token(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-
-
-
 @api_view(['POST'])
 def logout(request):
     response = Response()
@@ -192,19 +179,14 @@ def logout(request):
     return response
 
 
+logger = logging.getLogger(__name__)
 
-
-
-#Product  Views
+# Product Views
 @api_view(['GET'])
 def get_products(request):
     products = Product.objects.all()
     serializer = ProductSerializer(products, many=True)
     return Response(serializer.data)
-
-
-logger = logging.getLogger(__name__)
-
 
 
 @api_view(['GET'])
@@ -231,41 +213,35 @@ def get_products_by_category(request, category_name):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     except Exception as e:
-        logging.error(f"Error fetching products: {e}")
+        logger.error(f"Error fetching products: {e}")
         return Response({"detail": "Error fetching products"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    
-    
+
 @api_view(['POST'])
 def enter_product(request):
     try:
-        data = request.data.copy()  
+        data = request.data.copy()
 
         # Handle image file upload
         if 'image' in request.FILES:
             image = request.FILES['image']
-            
+
             # base64 encoding
             encoded_image = base64.b64encode(image.read()).decode('utf-8')
             data['image_base64'] = f"data:image/{image.name.split('.')[-1]};base64,{encoded_image}"
-        
-        
+
         serializer = ProductSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
             return JsonResponse(serializer.data, status=status.HTTP_201_CREATED)
         else:
             return JsonResponse(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-logger = logging.getLogger(__name__)
 
-
-
-
-#Order Views 
+# Order Views
 @api_view(['POST'])
 def create_order(request):
     try:
@@ -327,8 +303,8 @@ def create_order(request):
 
     except Exception as e:
         return Response({"detail": "Internal server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
-    
+
+
 @api_view(['GET'])
 def get_orders(request):
     try:
@@ -353,9 +329,8 @@ def get_orders(request):
 
     except Exception as e:
         return Response({"detail": "Internal server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
-    
-    
+
+
 @api_view(['GET'])
 def get_user_orders(request):
     try:
@@ -397,7 +372,8 @@ def get_user_orders(request):
 
     except Exception as e:
         return Response({"detail": "Internal server error: {}".format(str(e))}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+
+
 @api_view(['GET'])
 def get_orders_by_main_categories(request):
     try:
@@ -408,7 +384,7 @@ def get_orders_by_main_categories(request):
             "Clothing Accessories",
             "Electronics Appliances"
         ]
-        
+
         orders = Order.objects.filter(products__category__in=main_categories).distinct()
         order_data = []
 
@@ -430,7 +406,7 @@ def get_orders_by_main_categories(request):
 
     except Exception as e:
         return Response({"detail": "Internal server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+
 
 @api_view(['GET'])
 def get_orders_by_store(request, store_name):
@@ -443,15 +419,13 @@ def get_orders_by_store(request, store_name):
             "techworld": "Tech World",
         }
 
-
         if store_name.lower() not in category_choices:
             return Response({"detail": f"Store '{store_name}' does not exist."}, status=status.HTTP_400_BAD_REQUEST)
 
-
         orders = Order.objects.filter(products__category=category_choices[store_name.lower()]).distinct()
-        
+
         order_data = []
-        
+
         for order in orders:
             order_info = {
                 'order_id': order.id,
@@ -472,3 +446,104 @@ def get_orders_by_store(request, store_name):
     except Exception as e:
         logger.error(f"Error fetching orders by store: {e}")
         return Response({"detail": "Internal server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@csrf_exempt
+def newproducts(request):
+    if request.method == 'GET':
+        try:
+            pr = Product.objects.filter(date=timezone.now().date()).order_by('-date')[:5]
+            serializer = ProductSerializer(pr, many=True)
+            return JsonResponse(serializer.data, safe=False, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error(f"Error fetching new products: {e}")
+            return JsonResponse({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+
+@csrf_exempt
+def bestrate(request):
+    if request.method == 'GET':
+        try:
+            rate = Product.objects.order_by('-rating')[:5]
+            serializer = ProductSerializer(rate, many=True)
+            return JsonResponse(serializer.data, safe=False, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error(f"Error fetching best rated products: {e}")
+            return JsonResponse({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+
+from decimal import Decimal
+from bson.decimal128 import Decimal128
+
+@api_view(['GET'])
+def rateplus(request):
+    try:
+        product_id = request.query_params.get('product_id')
+        category = request.query_params.get('category')
+
+        if not product_id or not category:
+            return Response({"data": "error", "message": "Missing product_id or category"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            product = Product.objects.get(id=product_id, category=category)
+        except Product.DoesNotExist:
+            return Response({"data": "error", "message": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Convert Decimal128 to Decimal if needed
+        if isinstance(product.price, Decimal128):
+            try:
+                product.price = Decimal(product.price.to_decimal())
+            except Exception as e:
+                return Response({"data": "error", "message": f"Error converting price: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        product.rating = (product.rating or 0) + 1
+
+        serializer = ProductSerializer(product, data={'rating': product.rating}, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"data": "success", "rating": serializer.data['rating']}, status=status.HTTP_200_OK)
+        else:
+            return Response({"data": "error", "message": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+    except Exception as e:
+        logger.error(f"Exception details: {traceback.format_exc()}")
+        return Response({"data": "error", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+def rateminus(request):
+    try:
+        product_id = request.query_params.get('product_id')
+        category = request.query_params.get('category')
+
+        if not product_id or not category:
+            return Response({"data": "error", "message": "Missing product_id or category"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            product = Product.objects.get(id=product_id, category=category)
+        except Product.DoesNotExist:
+            return Response({"data": "error", "message": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Convert Decimal128 to Decimal if needed
+        if isinstance(product.price, Decimal128):
+            try:
+                product.price = Decimal(product.price.to_decimal())
+            except Exception as e:
+                return Response({"data": "error", "message": f"Error converting price: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        product.rating = (product.rating or 0) - 1
+
+        serializer = ProductSerializer(product, data={'rating': product.rating}, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"data": "success", "rating": serializer.data['rating']}, status=status.HTTP_200_OK)
+        else:
+            return Response({"data": "error", "message": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+    except Exception as e:
+        logger.error(f"Exception details: {traceback.format_exc()}")
+        return Response({"data": "error", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
